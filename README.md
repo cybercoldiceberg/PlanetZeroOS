@@ -27,7 +27,7 @@ PlanetZero OS is an independent, bare-metal x86_64 operating system built from s
 
 ### Quick Start
 ```bash
-git clone https://github.com
+git clone https://github.com/cybercoldiceberg/PlanetZeroOS
 cd PlanetZeroOS
 make
 qemu-system-x86_64 -drive format=raw,file=planetzero.img
