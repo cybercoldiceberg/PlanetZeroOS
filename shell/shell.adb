@@ -181,7 +181,7 @@ Sessions : array (TTY_ID) of Session_State;
       Print_Prompt (2);
 
       IO.Put_Line_On (3, "[TTY 3/3] PlanetZero Sandbox Console (Yellow)");
-      IO.Put_Line_On (3, "Ready for Ring-2 OCaml staging.");
+      IO.Put_Line_On (3, "Ready for ring-2 pending progress...");
       Print_Prompt (3);
 
       loop
