@@ -1,0 +1,22 @@
+# Ada / GNAT build artifacts
+*.o
+*.ali
+*.stdout
+*.stderr
+b~*
+
+# Binary, ELF, and Disk Images
+*.bin
+*.elf
+*.iso
+*.img
+*.qcow2
+iso_root/
+iso_storage/
+releases/
+
+# Archives & Temporary files
+*.7z
+*~
+*.swp
+.DS_Store
