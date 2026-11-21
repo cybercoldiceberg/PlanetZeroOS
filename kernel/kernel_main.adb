@@ -4,7 +4,7 @@ with GDT;
 with IDT;
 with TTY;
 with Shell;
-
+with PMM;
 procedure Kernel_Main is
    pragma Suppress (All_Checks);
 begin
@@ -16,7 +16,8 @@ begin
 
    TTY.Init;
    IDT.Init;
-   IO.Put_Line ("[RING-0] 64-bit IDT + PIC + PIT(100Hz) + IRQ1 active");
+   PMM.Init;
+   IO.Put_Line ("[RING-0] 64-bit IDT + PIC + PIT + PMM (64MB) active");
 
    Shell.Run;
 end Kernel_Main;
