@@ -6,6 +6,7 @@ with TTY; use type TTY.Event_Kind;
 with GDT;
 with IDT;
 with Ring1;
+with PMM;
 package body Shell is 
 	pragma Suppress (All_Checks);
 	type Session_State is record 
@@ -34,7 +35,7 @@ Sessions : array (TTY_ID) of Session_State;
 
     procedure Next_Token
       (T     : TTY_ID;
-      Pos   : in out Natural;
+       Pos   : in out Natural;
        First : out Natural;
        Last  : out Natural;
        Found : out Boolean)
@@ -70,14 +71,15 @@ Sessions : array (TTY_ID) of Session_State;
     procedure Print_Help is
     begin 
     	IO.Put_Line ("PZSH Commands: ");
-    	IO.Put_Line ("  help         - show this message");
-    	IO.Put_Line ("  clr          - clear active TTY");
-    	IO.Put_Line ("  repeat <x>   - print text");
-    	IO.Put_Line ("  get_ticks    - show PIT timer ticks");
-    	IO.Put_Line ("  rings        - inspect GDT/ISS rings");
-    	IO.Put_Line ("  ring1 [fault] - run Ada in Ring 1 Ada Drivers (CPL=1)");
-    	IO.Put_Line ("  tty <1-3>    - switch TTY (or Ctrl+Shift+Alt+1..3)");
-    	IO.Put_Line ("  hlt          - halt CPU"); 
+    	IO.Put_Line ("  help                    - show this message");
+    	IO.Put_Line ("  clr                     - clear active TTY");
+    	IO.Put_Line ("  repeat <x>              - print text");
+    	IO.Put_Line ("  get_ticks               - show PIT timer ticks");
+    	IO.Put_Line ("  rings                   - inspect GDT/TSS rings");
+    	IO.Put_Line ("  pmm                     - show physical memory stats");
+    	IO.Put_Line ("  ring1 [pci|rtc|fault]   - run Ring-1 Ada drivers");    
+    	IO.Put_Line ("  tty <1-3>               - switch TTY (or Ctrl+Shift+Alt+1..3)");
+    	IO.Put_Line ("  hlt                     - halt CPU"); 
     end Print_Help;
 
     procedure Execute_Line (Cur : TTY_ID; Next_TTY : out TTY_ID) is
@@ -105,7 +107,7 @@ Sessions : array (TTY_ID) of Session_State;
 
         end loop;
         IO.Put_Char (ASCII.LF);
-        elsif Match (Cur, F, L, "get_ticks") then
+       elsif Match (Cur, F, L, "get_ticks") then
           IO.Put_Str   ("Ticks: ");
           IO.Put_Hex64 (IDT.Ticks);
           IO.Put_Char (ASCII.LF);
@@ -116,25 +118,28 @@ Sessions : array (TTY_ID) of Session_State;
        	  IO.Put_Hex64 (U64 (GDT.Current_TR));
        	  IO.Put_Char (ASCII.LF);
        	  IO.Put_Line ("Rings: 0(0x08/10) 1(0x18/20) 2(0x28/30) 3(0x38/40)");
-       elsif Match (Cur, F, L, "ring1") then
-       	      Next_Token (Cur, Pos, A1, A2, Found);
-       	      declare
-       	      	 Code : U64;
-       	      begin 
-       	         if Found and then Match (Cur, A1, A2, "pci") then
-       	            Code := Ring1.Launch (Ring1.Mode_PCI);
-       	         elsif Found and then Match (Cur, A1, A2, "rtc") then
-       	         	Code := Ring1.Launch (Ring1.Mode_RTC);
-       	      	 if Found and then Match (Cur, A1, A2, "fault") then
-       	      	 	Code := Ring1.Launch (Ring1.Mode_Fault);
-       	      	 else
-       	      	    Code := Ring1.Launch (Ring1.Mode_Info);
-       	      	 end if;
-       	      	 IO.Put_Str ("[RING-0] Ring-1 exited with code ");
-       	      	 IO.Put_Hex64 (Code);
-       	      	 IO.Put_Char (ASCII.LF);
-       	    end if;
-       	end;
+       	  elsif Match (Cur, F, L, "pmm") then 
+       	     IO.Put_Str ("PMM Free Pages: ");
+       	     IO.Put_Hex64 (PMM.Free_Pages_Count);
+       	     IO.Put_Char (ASCII.LF); 
+          elsif Match (Cur, F, L, "ring1") then
+          Next_Token (Cur, Pos, A1, A2, Found);
+          declare
+             Code : U64;
+          begin 
+             if Found and then Match (Cur, A1, A2, "pci") then
+                Code := Ring1.Launch (Ring1.Mode_PCI);
+             elsif Found and then Match (Cur, A1, A2, "rtc") then
+                Code := Ring1.Launch (Ring1.Mode_RTC);
+             elsif Found and then Match (Cur, A1, A2, "fault") then 
+             Code := Ring1.Launch (Ring1.Mode_Fault);
+             else
+                Code := Ring1.Launch (Ring1.Mode_Info);
+             end if;
+             IO.Put_Str ("[RING-0] Ring-1 exited with code ");
+             IO.Put_Hex64 (Code);
+             IO.Put_Char (ASCII.LF);
+          end;
        elsif Match (Cur, F, L, "tty") then
        	  Next_Token (Cur, Pos, A1, A2, Found);
        	  if Found and then A1 = A2 then
@@ -150,13 +155,13 @@ Sessions : array (TTY_ID) of Session_State;
        	   else 
        	     IO.Put_Line ("Usage: tty <1|2|3>");
        	   end if;
-
-       	   elsif Match (Cur, F, L, "hlt") then
+       elsif Match (Cur, F, L, "hlt") then
        	   	IO.Put_Line ("System halted.");
        	   	loop
        	   		Asm ("cli; hlt", Volatile => True);
        	   	end loop;
-       	  else IO.Put_Str ("PZSH: unknown command: ");
+       else 
+          IO.Put_Str ("PZSH: unknown command: ");
        	  for I in F .. L loop
        	  	IO.Put_Char (Sessions (Cur).Line (I));
        	  end loop;
@@ -173,7 +178,7 @@ Sessions : array (TTY_ID) of Session_State;
      	for T in TTY_ID loop
      		Sessions (T).Len := 0;
         end loop; 
-         IO.Put_Line_On (1, "PZSH [TTY 1/3] - Ctrl+Shift+Alt+1..3 or 'tty <1-3>'");
+      IO.Put_Line_On (1, "PZSH [TTY 1/3] - Ctrl+Shift+Alt+1..3 or 'tty <1-3>'");
       Print_Prompt (1);
 
       IO.Put_Line_On (2, "[TTY 2/3] PlanetZero System Console (Cyan)");
@@ -215,5 +220,3 @@ Sessions : array (TTY_ID) of Session_State;
       end loop;
    end Run;
 end Shell;
-       
-       
